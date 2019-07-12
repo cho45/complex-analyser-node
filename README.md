@@ -7,7 +7,7 @@ WebAudio ComplexAnalyserNode using AudioWorklet and WebAssembly.
 Usage
 =====
 
-```
+```javascript
 
 import { ComplexAnalyserNode } from './complex-analyser-node.js';
 
