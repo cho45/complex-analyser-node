@@ -117,25 +117,29 @@ const app = new Vue({
 			this.freqResolution = freqResolution;
 			this.timeResolution = timeResolution;
 
-			const canvas = this.$refs.ffthist;
-			canvas.width = HISTORY;
-			canvas.height = this.complexAnalyserNode.fftSize;
+			const canvasHist = this.$refs.ffthist;
+			canvasHist.width = HISTORY;
+			canvasHist.height = this.complexAnalyserNode.fftSize;
 
-			this.$refs.fftwave.width = 50;
-			this.$refs.fftwave.height = canvas.height;
+			const ctxHist = canvasHist.getContext('2d');
+			ctxHist.fillRect(0, 0, canvasHist.width, canvasHist.height);
+
+			this.canvasHist = canvasHist;
+			this.ctxHist = ctxHist;
+
+			const canvasWave = this.$refs.fftwave;
+			canvasWave.width = 50;
+			canvasWave.height = canvasHist.height;
+
+			const ctxWave = canvasWave.getContext('2d');
+			this.canvasWave = canvasWave;
+			this.ctxWave = ctxWave;
+
+			this.imageData = ctxHist.createImageData(1, canvasHist.height);
 
 			this.fftHistory = [];
-			this.fftMovingAvg = new Float32Array(canvas.height);
+			this.fftMovingAvg = new Float32Array(canvasHist.height);
 			this.fftHistorySize = 100;
-
-
-			const ctx = canvas.getContext('2d');
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-			this.ctx = ctx;
-			this.canvas = canvas;
-			this.imageData = ctx.createImageData(1, canvas.height);
-			console.log(this.imageData);
 
 			const buffer = new Float32Array(this.complexAnalyserNode.fftSize);
 
@@ -166,24 +170,29 @@ const app = new Vue({
 		},
 
 		processFrequencyData: function (buffer) {
-			const ctx = this.ctx;
-			const canvas = this.canvas;
+			const { canvasHist, ctxHist, canvasWave, ctxWave } = this;
+
+			ctxWave.fillStyle = '#000000';
+			ctxWave.strokeStyle = '#ffffff';
+			ctxWave.fillRect(0, 0, canvasWave.width, canvasWave.height);
+			ctxWave.beginPath();
+			ctxWave.moveTo(0, 0);
 
 			// shift left current image
-			ctx.drawImage(
-				canvas,
+			ctxHist.drawImage(
+				canvasHist,
 
 				1, 0,
-				canvas.width - 1, canvas.height,
+				canvasHist.width - 1, canvasHist.height,
 
 				0, 0,
-				canvas.width - 1, canvas.height
+				canvasHist.width - 1, canvasHist.height
 			);
 
 			const imageData = this.imageData;
 			const data = imageData.data;
 
-			for (let i = 0, len = canvas.height; i < len; i++) {
+			for (let i = 0, len = canvasHist.height; i < len; i++) {
 				const index = (len-i);
 
 				// const dB = (buffer[index] / 255) * (this.analyserNode.maxDecibels - this.analyserNode.minDecibels) + this.analyserNode.minDecibels;
@@ -195,8 +204,19 @@ const app = new Vue({
 				data[n + 2] = rgb.b;
 				data[n + 3] = 255;
 
+				ctxWave.lineTo( (dB + 100) / 70 * canvasWave.width, i);
 			}
-			ctx.putImageData(imageData, canvas.width - 1, 0);
+			ctxHist.putImageData(imageData, canvasHist.width - 1, 0);
+
+			ctxWave.lineWidth = 1;
+			ctxWave.stroke();
+
+			ctxWave.strokeStyle = '#ff0000';
+			ctxWave.beginPath();
+			ctxWave.moveTo(0, canvasWave.height / 2);
+			ctxWave.lineTo(canvasWave.width, canvasWave.height / 2);
+			ctxWave.lineWidth = 3;
+			ctxWave.stroke();
 		},
 
 		processTimeDomainData: function (buffer) {

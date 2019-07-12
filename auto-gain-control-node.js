@@ -21,7 +21,7 @@ export class AutoGainControlNode extends AudioWorkletNode {
 					this.gain = 1.0;
 
 					this.rate = 0.01;
-					this.target = Math.pow(10, -30/20);
+					this.target = Math.pow(10, -40/20);
 				}
 
 				process(inputs, outputs, _parameters) {
