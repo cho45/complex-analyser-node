@@ -126,49 +126,6 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		}
 	}
 
-	/*
-	getFloatFrequencyData(result) {
-		if (!this.FFT) {
-			throw "call init() before getFloatFrequencyData";
-		}
-		const { smoothingTimeConstant, prev, window, buffer } = this;
-		const N = this.fftSize;
-
-		const input = new Float32Array(buffer);
-		for (var i = 0; i < N; i++) {
-			input[i*2+0] *= window[i];
-			input[i*2+1] *= window[i];
-		}
-
-		const output = input;
-
-		this.FFT.fft(input, output);
-
-		// USB
-		const halfN = N / 2;
-		for (var i = 0; i < halfN; i++) {
-			result[i+halfN] = Math.hypot(output[i*2+0], output[i*2+1]) / N;
-		}
-		// LSB
-		for (var i = halfN; i < N; i++) {
-			result[i-halfN] = Math.hypot(output[i*2+0], output[i*2+1]) / N;
-		}
-
-
-		for (var i = 0; i < N; i++) {
-			const Xk = result[i];
-			const Xp = prev[i];
-			result[i] = smoothingTimeConstant * Xp + (1 - smoothingTimeConstant) * Xk;
-		}
-
-		prev.set(result);
-
-		for (var i = 0; i < N; i++) {
-			result[i] = Math.log10(result[i]) * 20;
-		}
-	}
-	//*/
-
 	getFloatFrequencyData(result) {
 		if (!this.kernel) {
 			throw "call init() before getFloatFrequencyData";
@@ -221,7 +178,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 	}
 
 	static addModule(context) {
-		const processor = (() => { 
+		const processor = (() => {
 			// AudioWorkletGlobalScope
 			class ComplexAnalyserProcessor extends AudioWorkletProcessor {
 				constructor() {
@@ -229,7 +186,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 
 					this.buffers = [];
 					this.info = {};
-					this.port.onmessage = (e) => {
+					this.port.onmessage = (_e) => {
 						this.port.postMessage({
 							info: this.info,
 							buffers: this.buffers
@@ -264,8 +221,6 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 
 		const url = URL.createObjectURL(new Blob(['(', processor, ')()'], { type: 'application/javascript' }));
 		return context.audioWorklet.addModule(url);
-
-		//return context.audioWorklet.addModule('./complex-analyser-processor.js?' + Date.now());
 	}
 }
 
