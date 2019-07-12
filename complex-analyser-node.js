@@ -81,19 +81,18 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 	}
 
 	async init() {
-		/*
-		const wasm = "./lib/wa_dsp_bg.wasm";
+		const base = import.meta.url.replace(/[^/]+$/, '');
+		const wasm = base + "./web/wa_dsp_bg.wasm";
 
 		console.log('compiling wasm module', wasm);
 		const module = await WebAssembly.compile(await (await fetch(wasm)).arrayBuffer())
 		console.log('load wasm bridge', module);
-		this.lib = await import("./lib/wa_dsp.js");
+		this.lib = await import(base + "./web/wa_dsp.js");
 		console.log('initialize wasm module', this.lib);
 		await this.lib.default(module);
 		console.log('initialized module');
-		*/
 
-		this.lib = await import("./browser/wa_dsp.js");
+		// this.lib = await import("./browser/wa_dsp.js");
 
 		this.initialized = true;
 		this._createKernel();

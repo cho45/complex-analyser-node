@@ -1,22 +1,25 @@
 {
-  "name": "complex-analyser-node",
-  "type": "module",
-  "version": "1.0.0",
-  "description": "WebAudio ComplexAnalyserNode (FFT for I/Q signal)",
-  "main": "complex-analyser-node.js",
-  "dependencies": {},
-  "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/cho45/complex-analyser-node.git"
-  },
-  "author": "",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/cho45/complex-analyser-node/issues"
-  },
-  "homepage": "https://github.com/cho45/complex-analyser-node#readme"
+	"name": "complex-analyser-node",
+	"type": "module",
+	"version": "1.0.0",
+	"description": "WebAudio ComplexAnalyserNode (FFT for I/Q signal)",
+	"main": "complex-analyser-node.js",
+	"dependencies": {},
+	"devDependencies": {
+		"http-server": "^0.11.1"
+	},
+	"scripts": {
+		"serve": "http-server ./ --port 8080",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/cho45/complex-analyser-node.git"
+	},
+	"author": "",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/cho45/complex-analyser-node/issues"
+	},
+	"homepage": "https://github.com/cho45/complex-analyser-node#readme"
 }
