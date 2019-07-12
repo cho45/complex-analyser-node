@@ -1,5 +1,6 @@
 
 import { ComplexAnalyserNode } from "../complex-analyser-node.js";
+import { AutoGainControlNode } from "../auto-gain-control-node.js";
 
 function convertDecibelToRGB (dB) {
 	var r = 0, g = 0, b = 0;
@@ -77,7 +78,13 @@ const app = new Vue({
 			this.audioContext = new AudioContext();
 			const sampleRate = 44100; // XXX: this.audioContext.sampleRate is untrusted value....
 
-			await ComplexAnalyserNode.addModule(this.audioContext);
+			await Promise.all([
+				AutoGainControlNode.addModule(this.audioContext),
+				ComplexAnalyserNode.addModule(this.audioContext),
+			]);
+
+			this.autoGainControlNode = new AutoGainControlNode(this.audioContext, {});
+
 			this.complexAnalyserNode = new ComplexAnalyserNode(this.audioContext, {
 				fftSize: 4096
 			});
@@ -93,7 +100,8 @@ const app = new Vue({
 			console.log(stream);
 			const mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
 			console.log(mediaStreamSource);
-			mediaStreamSource.connect(this.complexAnalyserNode);
+			mediaStreamSource.connect(this.autoGainControlNode);
+			this.autoGainControlNode.connect(this.complexAnalyserNode);
 
 			const gain = this.audioContext.createGain();
 			gain.gain.value = 0;

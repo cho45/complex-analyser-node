@@ -205,8 +205,8 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 						buffer[i*2+0] = input[0][i];
 						buffer[i*2+1] = input[1][i];
 
-						input[0][i] = output[0][i];
-						input[1][i] = output[1][i];
+						output[0][i] = input[0][i];
+						output[1][i] = input[1][i];
 					}
 
 					this.info = { inputCount: input.length, channelCount: input[0].length, channelLength: input[0][0].length };
