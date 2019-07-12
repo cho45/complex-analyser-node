@@ -1,0 +1,20 @@
+{
+	"name": "wa-dsp-site",
+	"version": "1.0.0",
+	"description": "",
+	"main": "script.js",
+	"scripts": {
+		"serve": "webpack-dev-server",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "",
+	"license": "MIT",
+	"dependencies": {
+		"webpack": "^4.35.3",
+		"webpack-cli": "^3.3.5",
+		"webpack-dev-server": "^3.7.2"
+	},
+	"devDependencies": {
+		"url-loader": "^2.0.1"
+	}
+}

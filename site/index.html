@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+
+		<title></title>
+
+
+		<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+		<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+		<script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
+		<style>
+body {
+	margin: 0;
+	padding: 0
+}
+
+canvas {
+	/* image-rendering: pixelated; */
+}
+
+#app {
+	display: flex;
+}
+
+.right {
+	width: 70%;
+}
+
+.canvas-container {
+	display: flex;
+	width: 30%;
+	height: 100vh;
+}
+
+.canvas-container #ffthist {
+	width: 90%;
+	height: 100%;
+}
+
+.canvas-container #fftwave {
+	width: 10%;
+	height: 100%;
+}
+		</style>
+	</head>
+	<body>
+		<div id="app">
+			<div class="canvas-container">
+				<canvas id="ffthist" ref="ffthist"></canvas>
+				<canvas id="fftwave" ref="fftwave"></canvas>
+			</div>
+			<div class="right">
+				<div style="padding: 10px">
+					<button 
+						 class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent"
+						v-on:click="run" v-if="!running">run</button>
+					<span>{{fps}} fps</span>
+				</div>
+				<canvas ref="waveform" style="width: 100%"></canvas>
+				<canvas ref="waveform2" style="width: 100%"></canvas>
+				<p>{{predicted}} {{ snr.toFixed(2) }}dB</p>
+				<p>{{peaks}}</p>
+			</div>
+		</div>
+		<!-- script src="node_modules/comlink/dist/umd/comlink.min.js"></script -->
+		<script src="index.js" type="module"></script>
+	</body>
+</html>
