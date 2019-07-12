@@ -4,6 +4,8 @@ ComplexAnalyserNode
 
 WebAudio ComplexAnalyserNode using AudioWorklet and WebAssembly.
 
+![demo](./docs/demo.gif )
+
 Usage
 =====
 
