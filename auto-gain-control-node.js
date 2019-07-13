@@ -20,15 +20,14 @@ export class AutoGainControlNode extends AudioWorkletNode {
 					super();
 					this.gain = 1.0;
 
-					this.rate = 0.01;
-					this.target = Math.pow(10, -40/20);
+					this.rate = 1e-2;
+					this.target = Math.pow(10, -30/20);
 				}
 
 				process(inputs, outputs, _parameters) {
 					const input  = inputs[0];
 					const output = outputs[0];
 					const length = input[0].length;
-					const buffer = new Float32Array(length * 2);
 
 					let gain = this.gain;
 					const { rate, target } = this;

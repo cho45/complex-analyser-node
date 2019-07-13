@@ -3,9 +3,21 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 
 	set fftSize(value) {
 		this._fftSize = value;
+
+		/*
 		this.buffer = new Float32Array(this._fftSize * 2);
-		this.prev   = new Float32Array(this._fftSize * 2);
 		this.window = new Float32Array(this._fftSize);
+		*/
+
+		this.buffer = new Float32Array(this._fftSize * 2);
+
+		if (this.input) this.input.free();
+		if (this.output) this.output.free();
+		if (this.window) this.window.free();
+
+		this.input  = this.typedMalloc(Float32Array, this._fftSize * 2);
+		this.output = this.typedMalloc(Float32Array, this._fftSize);
+		this.window = this.typedMalloc(Float32Array, this._fftSize);
 
 		this._createWindow();
 		this._createKernel();
@@ -55,7 +67,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		this.maxDecibels = typeof opts.maxDecibels !== 'undefined' ? opts.maxDecibels : -30;
 		this.minDecibels = typeof opts.minDecibels !== 'undefined' ? opts.minDecibels : -100;
 		this.smoothingTimeConstant = typeof opts.smoothingTimeConstant !== 'undefined' ? opts.smoothingTimeConstant : 0.8;
-		this.windowFunction = opts.windowFunction || function (x) {
+		this._windowFunction = opts.windowFunction || function (x) {
 			// blackman window
 			const alpha = 0.16;
 			const a0 = (1.0 - alpha) / 2.0;
@@ -63,7 +75,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 			const a2 = alpha / 2.0;
 			return  a0 - a1 * Math.cos(2 * Math.PI * x) + a2 * Math.cos(4 * Math.PI * x);
 		};
-		this.fftSize = opts.fftSize || 2048; /* 32 - 32768 */
+		this._fftSize = opts.fftSize || 2048; /* 32 - 32768 */
 		this.initialized = false;
 
 		this.port.onmessage = (e) => {
@@ -76,7 +88,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		};
 
 		this.timer = setInterval( () => {
-			this.port.postMessage({});
+			this.port.postMessage({ method: 'buffer'  });
 		}, 24);
 	}
 
@@ -89,13 +101,14 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		console.log('load wasm bridge', module);
 		this.lib = await import(base + "./web/wa_dsp.js");
 		console.log('initialize wasm module', this.lib);
-		await this.lib.default(module);
-		console.log('initialized module');
+		this.wasm = await this.lib.default(module);
+		console.log('initialized module', this.wasm);
 
 		// this.lib = await import("./browser/wa_dsp.js");
 
 		this.initialized = true;
 		this._createKernel();
+		this.fftSize = this._fftSize;
 	}
 
 	_createKernel() {
@@ -115,8 +128,8 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 	}
 
 	_createWindow() {
-		const { window } = this;
-
+		if (!this.window) return;
+		const window = this.window.array;
 		const func = this.windowFunction;
 		const N = this.fftSize;
 
@@ -129,11 +142,18 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		if (!this.kernel) {
 			throw "call init() before getFloatFrequencyData";
 		}
-		const { window, buffer } = this;
+		const { kernel, window, buffer, input, output } = this;
 
-		const input = new Float32Array(buffer);
+		input.array.set(buffer);
 
-		this.kernel.calculate_frequency_data(input, result, window);
+		this.wasm.complexanalyserkernel_calculate_frequency_data(
+			kernel.ptr,
+			input.ptr, input.len,
+			output.ptr, output.len,
+			window.ptr, window.len
+		);
+
+		result.set(output.array);
 	}
 
 	getByteFrequencyData(result) {
@@ -169,10 +189,35 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		}
 	}
 
+	typedMalloc(constructor, length) {
+		if (!this.wasm) return;
+		const bytes = length * constructor.BYTES_PER_ELEMENT;
+		const wasm = this.wasm;
+		let ptr = this.wasm.__wbindgen_malloc(bytes);
+		return {
+			ptr: ptr,
+			byteLength: bytes,
+			len: length,
+			get array() {
+				if (ptr !== 0) {
+					return new constructor(wasm.memory.buffer, ptr, length);
+				}
+			},
+			free() {
+				wasm.__wbindgen_free(ptr, bytes);
+				ptr = 0;
+			}
+		};
+	}
+
 	free() {
 		if (this.kernel) {
 			this.kernel.free();
 		}
+		if (this.input) this.input.free();
+		if (this.output) this.output.free();
+		if (this.window) this.window.free();
+		this.port.postMessage({ method: 'free'  });
 		clearInterval(this.timer);
 	}
 
@@ -182,15 +227,21 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 			class ComplexAnalyserProcessor extends AudioWorkletProcessor {
 				constructor() {
 					super();
+					this.end = false;
 
 					this.buffers = [];
 					this.info = {};
-					this.port.onmessage = (_e) => {
-						this.port.postMessage({
-							info: this.info,
-							buffers: this.buffers
-						});
-						this.buffers.length = 0;
+					this.port.onmessage = (e) => {
+						if (e.data.method === 'buffer') {
+							this.port.postMessage({
+								info: this.info,
+								buffers: this.buffers
+							});
+							this.buffers.length = 0;
+						} else
+						if (e.data.method === 'free') {
+							this.end = true;
+						}
 					};
 				}
 
@@ -211,7 +262,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 
 					this.info = { inputCount: input.length, channelCount: input[0].length, channelLength: input[0][0].length };
 					this.buffers.push(buffer);
-					return true;
+					return !this.end;
 				}
 			}
 
