@@ -1,6 +1,9 @@
 
 import { ComplexAnalyserNode } from "../complex-analyser-node.js";
 import { AutoGainControlNode } from "../auto-gain-control-node.js";
+import { ComplexBandpassFilterNode } from "../complex-bandpass-filter-node.js";
+import { FrequencyConverterNode } from "../frequency-converter-node.js";
+import { DemodulateProtoNode } from "../demodulate-proto-node.js";
 
 function convertDecibelToRGB (dB) {
 	var r = 0, g = 0, b = 0;
@@ -62,6 +65,14 @@ const app = new Vue({
 		running: false,
 		predicted: '',
 		snr: 0,
+		lsb: false,
+		bandpass: {
+			bandwidth: "3000",
+			freq: "1700",
+		},
+		converter: {
+			freq: "1700",
+		},
 		peaks: []
 	},
 
@@ -69,6 +80,13 @@ const app = new Vue({
 	},
 
 	mounted: async function () {
+		this.$watch('bandpass', (newVal, oldVal) => {
+			console.log('bandpass params changes', newVal);
+			this.updateBandpassCoeffs();
+		}, { deep: true });
+		this.$watch('lsb', (newVal, oldVal) => {
+			this.updateBandpassCoeffs();
+		});
 	},
 
 	methods: {
@@ -81,13 +99,21 @@ const app = new Vue({
 			await Promise.all([
 				AutoGainControlNode.addModule(this.audioContext),
 				ComplexAnalyserNode.addModule(this.audioContext),
+				ComplexBandpassFilterNode.addModule(this.audioContext),
+				FrequencyConverterNode.addModule(this.audioContext),
+				DemodulateProtoNode.addModule(this.audioContext),
 			]);
 
 			this.autoGainControlNode = new AutoGainControlNode(this.audioContext, {});
+			this.complexBandpassFilterNode = new ComplexBandpassFilterNode(this.audioContext, {
+				coeffs: []
+			});
 
 			this.complexAnalyserNode = new ComplexAnalyserNode(this.audioContext, {
 				fftSize: 4096
 			});
+
+			this.demodulateNode = new DemodulateProtoNode(this.audioContext);
 
 			const stream = await navigator.mediaDevices.getUserMedia({
 				audio: {
@@ -100,15 +126,47 @@ const app = new Vue({
 			console.log(stream);
 			const mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
 			console.log(mediaStreamSource);
-			mediaStreamSource.connect(this.autoGainControlNode);
-			this.autoGainControlNode.connect(this.complexAnalyserNode);
-
 			const gain = this.audioContext.createGain();
-			gain.gain.value = 0;
-			this.complexAnalyserNode.connect(gain);
-			await this.complexAnalyserNode.init();
+			gain.gain.value = 3;
+
+			const freqConv = true;
+			if (freqConv) {
+				this.frequencyConverterNode = new FrequencyConverterNode(this.audioContext);
+				this.frequencyConverterNode.loFrequency.value = -Number(this.bandpass.freq);
+
+				this.complexBandpassFilterNode2 = new ComplexBandpassFilterNode(this.audioContext, {
+					coeffs: []
+				});
+
+				this.complexAnalyserNode2 = new ComplexAnalyserNode(this.audioContext, {
+					fftSize: 4096
+				});
+
+				const nodes = [
+					mediaStreamSource,
+					this.autoGainControlNode,
+					this.complexAnalyserNode,
+					this.complexBandpassFilterNode,
+					this.frequencyConverterNode,
+					this.complexAnalyserNode2,
+					this.complexBandpassFilterNode2,
+					this.demodulateNode
+				];
+
+				for (let i = 1; i < nodes.length; i++) {
+					nodes[i-1].connect(nodes[i]);
+				}
+			} else {
+				mediaStreamSource.connect(this.autoGainControlNode);
+				this.autoGainControlNode.connect(this.complexBandpassFilterNode);
+				this.complexBandpassFilterNode.connect(this.complexAnalyserNode);
+				this.complexAnalyserNode.connect(this.demodulateNode);
+			}
+
+			this.demodulateNode.connect(gain);
 			gain.connect(this.audioContext.destination);
 
+			this.updateBandpassCoeffs();
 
 
 			const freqResolution = sampleRate / this.complexAnalyserNode.fftSize;
@@ -120,12 +178,18 @@ const app = new Vue({
 			const canvasHist = this.$refs.ffthist;
 			canvasHist.width = HISTORY;
 			canvasHist.height = this.complexAnalyserNode.fftSize;
-
 			const ctxHist = canvasHist.getContext('2d');
 			ctxHist.fillRect(0, 0, canvasHist.width, canvasHist.height);
-
 			this.canvasHist = canvasHist;
 			this.ctxHist = ctxHist;
+
+			const canvasHist2 = this.$refs.ffthist2;
+			canvasHist2.width = HISTORY / 2;
+			canvasHist2.height = this.complexAnalyserNode2.fftSize;
+			const ctxHist2 = canvasHist2.getContext('2d');
+			ctxHist2.fillRect(0, 0, canvasHist2.width, canvasHist2.height);
+			this.canvasHist2 = canvasHist2;
+			this.ctxHist2 = ctxHist2;
 
 			const canvasWave = this.$refs.fftwave;
 			canvasWave.width = 50;
@@ -163,10 +227,51 @@ const app = new Vue({
 				this.complexAnalyserNode.getFloatFrequencyData(buffer);
 				this.processFrequencyData(buffer);
 
+				this.complexAnalyserNode2.getFloatFrequencyData(buffer);
+				this.processFrequencyData2(buffer);
+
 				requestAnimationFrame(render);
 			};
 
 			requestAnimationFrame(render);
+		},
+
+		updateBandpassCoeffs: function () {
+			const sampleRate = this.audioContext.sampleRate;
+			if (this.complexBandpassFilterNode) {
+				console.log({sampleRate}, this.bandpass);
+
+				let lFreq, hFreq;
+				if (!this.lsb) {
+					lFreq = Number(this.bandpass.freq);
+					hFreq = Number(this.bandpass.freq) + Number(this.bandpass.bandwidth);
+				} else {
+					lFreq = Number(this.bandpass.freq) - Number(this.bandpass.bandwidth);
+					hFreq = Number(this.bandpass.freq);
+				}
+
+				this.complexBandpassFilterNode.coeffs = ComplexBandpassFilterNode.calculateCoeffs(
+					711,
+					sampleRate,
+					lFreq,
+					hFreq,
+					function (x) {
+						return 0.54 - 0.46 * Math.cos(2 * Math.PI * x);
+					}
+				);
+			}
+			if (this.complexBandpassFilterNode2) {
+				this.complexBandpassFilterNode2.coeffs = ComplexBandpassFilterNode.calculateCoeffs(
+					711,
+					sampleRate,
+					-Number(20000 || this.bandpass.bandwidth),
+					+Number(20000 || this.bandpass.bandwidth),
+					function (x) {
+						return 0.54 - 0.46 * Math.cos(2 * Math.PI * x);
+					}
+				);
+				this.frequencyConverterNode.loFrequency.value = -Number(this.bandpass.freq);
+			}
 		},
 
 		processFrequencyData: function (buffer) {
@@ -211,12 +316,54 @@ const app = new Vue({
 			ctxWave.lineWidth = 1;
 			ctxWave.stroke();
 
-			ctxWave.strokeStyle = '#ff0000';
-			ctxWave.beginPath();
-			ctxWave.moveTo(0, canvasWave.height / 2);
-			ctxWave.lineTo(canvasWave.width, canvasWave.height / 2);
-			ctxWave.lineWidth = 3;
-			ctxWave.stroke();
+			const freqLines = [0, Number(this.bandpass.freq), Number(this.bandpass.freq) + (Number(this.bandpass.bandwidth) * (this.lsb ? -1 : 1))];
+			for (let freq of freqLines) {
+				const pos = freq / this.freqResolution;
+
+				ctxWave.strokeStyle = '#ff0000';
+				ctxWave.beginPath();
+				ctxWave.moveTo(0, canvasWave.height / 2 - pos);
+				ctxWave.lineTo(canvasWave.width, canvasWave.height / 2 - pos);
+				ctxWave.lineWidth = 5;
+				ctxWave.stroke();
+			}
+
+			ctxWave.fillStyle = 'rgba(100, 100, 255, 0.5)';
+			ctxWave.fillRect(
+				0, (canvasWave.height / 2) - (Number(this.bandpass.freq) / this.freqResolution),
+				canvasWave.width,  (Number(this.bandpass.bandwidth) / this.freqResolution * (this.lsb ? 1 : -1)),
+			);
+		},
+
+		processFrequencyData2: function (buffer) {
+			const { canvasHist2: canvasHist, ctxHist2: ctxHist } = this;
+			// shift left current image
+			ctxHist.drawImage(
+				canvasHist,
+
+				1, 0,
+				canvasHist.width - 1, canvasHist.height,
+
+				0, 0,
+				canvasHist.width - 1, canvasHist.height
+			);
+
+			const imageData = this.imageData;
+			const data = imageData.data;
+
+			for (let i = 0, len = canvasHist.height; i < len; i++) {
+				const index = (len-i);
+
+				// const dB = (buffer[index] / 255) * (this.analyserNode.maxDecibels - this.analyserNode.minDecibels) + this.analyserNode.minDecibels;
+				const dB = buffer[index];
+				const rgb = convertDecibelToRGB(dB);
+				const n = i * 4;
+				data[n + 0] = rgb.r;
+				data[n + 1] = rgb.g;
+				data[n + 2] = rgb.b;
+				data[n + 3] = 255;
+			}
+			ctxHist.putImageData(imageData, canvasHist.width - 1, 0);
 		},
 
 		processTimeDomainData: function (buffer) {

@@ -40,7 +40,6 @@ mediaStreamSource.connect(complexAnalyserNode);
 const gain = audioContext.createGain();
 gain.gain.value = 0;
 complexAnalyserNode.connect(gain);
-await complexAnalyserNode.init();
 gain.connect(audioContext.destination);
 
 const I = new Float32Array(complexAnalyserNode.fftSize);

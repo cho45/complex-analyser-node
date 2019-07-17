@@ -75,8 +75,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 			const a2 = alpha / 2.0;
 			return  a0 - a1 * Math.cos(2 * Math.PI * x) + a2 * Math.cos(4 * Math.PI * x);
 		};
-		this._fftSize = opts.fftSize || 2048; /* 32 - 32768 */
-		this.initialized = false;
+		this.fftSize = opts.fftSize || 2048; /* 32 - 32768 */
 
 		this.port.onmessage = (e) => {
 			const buffers = e.data.buffers;
@@ -93,27 +92,9 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 	}
 
 	async init() {
-		const base = import.meta.url.replace(/[^/]+$/, '');
-		const wasm = base + "./web/wa_dsp_bg.wasm";
-
-		console.log('compiling wasm module', wasm);
-		const module = await WebAssembly.compile(await (await fetch(wasm)).arrayBuffer())
-		console.log('load wasm bridge', module);
-		this.lib = await import(base + "./web/wa_dsp.js");
-		console.log('initialize wasm module', this.lib);
-		this.wasm = await this.lib.default(module);
-		console.log('initialized module', this.wasm);
-
-		// this.lib = await import("./browser/wa_dsp.js");
-
-		this.initialized = true;
-		this._createKernel();
-		this.fftSize = this._fftSize;
 	}
 
 	_createKernel() {
-		if (!this.initialized) return;
-
 		if (this.kernel) {
 			if (this.kernel.get_n() === this.fftSize) {
 				// nothing to do
@@ -123,7 +104,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 			}
 		}
 
-		this.kernel = new this.lib.ComplexAnalyserKernel(this.fftSize, this.smoothingTimeConstant);
+		this.kernel = new this.constructor.lib.ComplexAnalyserKernel(this.fftSize, this.smoothingTimeConstant);
 		console.log('New Kernel instanciated', this.kernel, this.fftSize);
 	}
 
@@ -146,7 +127,7 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 
 		input.array.set(buffer);
 
-		this.wasm.complexanalyserkernel_calculate_frequency_data(
+		this.constructor.wasm.complexanalyserkernel_calculate_frequency_data(
 			kernel.ptr,
 			input.ptr, input.len,
 			output.ptr, output.len,
@@ -190,10 +171,10 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 	}
 
 	typedMalloc(constructor, length) {
-		if (!this.wasm) return;
+		if (!this.constructor.wasm) return;
 		const bytes = length * constructor.BYTES_PER_ELEMENT;
-		const wasm = this.wasm;
-		let ptr = this.wasm.__wbindgen_malloc(bytes);
+		const wasm = this.constructor.wasm;
+		let ptr = this.constructor.wasm.__wbindgen_malloc(bytes);
 		return {
 			ptr: ptr,
 			byteLength: bytes,
@@ -221,7 +202,20 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		clearInterval(this.timer);
 	}
 
-	static addModule(context) {
+	static async loadWasm() {
+		const base = import.meta.url.replace(/[^/]+$/, '');
+		const wasm = base + "./web/wa_dsp_bg.wasm";
+
+		console.log('compiling wasm module', wasm);
+		const module = await WebAssembly.compile(await (await fetch(wasm)).arrayBuffer())
+		console.log('load wasm bridge', module);
+		this.lib = await import(base + "./web/wa_dsp.js");
+		console.log('initialize wasm module', this.lib);
+		this.wasm = await this.lib.default(module);
+		console.log('initialized module', this.wasm);
+	}
+
+	static async addModule(context) {
 		const processor = (() => {
 			// AudioWorkletGlobalScope
 			class ComplexAnalyserProcessor extends AudioWorkletProcessor {
@@ -230,11 +224,9 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 					this.end = false;
 
 					this.buffers = [];
-					this.info = {};
 					this.port.onmessage = (e) => {
 						if (e.data.method === 'buffer') {
 							this.port.postMessage({
-								info: this.info,
 								buffers: this.buffers
 							});
 							this.buffers.length = 0;
@@ -260,7 +252,6 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 						output[1][i] = input[1][i];
 					}
 
-					this.info = { inputCount: input.length, channelCount: input[0].length, channelLength: input[0][0].length };
 					this.buffers.push(buffer);
 					return !this.end;
 				}
@@ -270,7 +261,10 @@ export class ComplexAnalyserNode extends AudioWorkletNode {
 		}).toString();
 
 		const url = URL.createObjectURL(new Blob(['(', processor, ')()'], { type: 'application/javascript' }));
-		return context.audioWorklet.addModule(url);
+		return Promise.all([
+			context.audioWorklet.addModule(url),
+			this.loadWasm(),
+		]);
 	}
 }
 

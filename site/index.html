@@ -6,12 +6,29 @@
 
 		<title></title>
 
-
-		<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-		<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
-		<script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
-		<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
+
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" type="text/css">
+		<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/theme/theme.min.css">
+
+
+		<script src="https://unpkg.com/vue"></script>
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/typography/typography.min.css">
+		<script src="https://unpkg.com/material-components-vue/dist/typography/typography.min.js"></script>
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/button/button.min.css">
+		<script src="https://unpkg.com/material-components-vue/dist/button/button.min.js"></script>
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/checkbox/checkbox.min.css">
+		<script src="https://unpkg.com/material-components-vue/dist/checkbox/checkbox.min.js"></script>
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/form-field/form-field.min.css">
+		<script src="https://unpkg.com/material-components-vue/dist/form-field/form-field.min.js"></script>
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/floating-label/floating-label.min.css">
+		<script src="https://unpkg.com/material-components-vue/dist/floating-label/floating-label.min.js"></script>
+		<link rel="stylesheet" href="https://unpkg.com/material-components-vue/dist/text-field/text-field.min.css">
+		<script src="https://unpkg.com/material-components-vue/dist/text-field/text-field.min.js"></script>
+
+
 		<style>
 body {
 	margin: 0;
@@ -37,12 +54,17 @@ canvas {
 }
 
 .canvas-container #ffthist {
-	width: 90%;
+	width: 60%;
 	height: 100%;
 }
 
 .canvas-container #fftwave {
 	width: 10%;
+	height: 100%;
+}
+
+.canvas-container #ffthist2 {
+	width: 30%;
 	height: 100%;
 }
 		</style>
@@ -52,13 +74,26 @@ canvas {
 			<div class="canvas-container">
 				<canvas id="ffthist" ref="ffthist"></canvas>
 				<canvas id="fftwave" ref="fftwave"></canvas>
+				<canvas id="ffthist2" ref="ffthist2"></canvas>
 			</div>
 			<div class="right">
 				<div style="padding: 10px">
-					<button 
-						 class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent"
-						v-on:click="run" v-if="!running">run</button>
-					<span>{{fps}} fps</span>
+					<m-typography>
+						<m-button v-on:click="run" v-if="!running" raised>run</m-button>
+						<span>{{fps}} fps</span>
+					</m-typography>
+				</div>
+				<div>
+					<m-text-field v-model="bandpass.bandwidth" type="number">
+						<m-floating-label for="textfield">Bandwidth</m-floating-label>
+					</m-text-field>
+					<m-text-field v-model="bandpass.freq" type="number">
+						<m-floating-label for="textfield">LO Freq</m-floating-label>
+					</m-text-field>
+					<m-form-field>
+						<m-checkbox v-model="lsb"></m-checkbox>
+						<label>LSB</label>
+					</m-form-field>
 				</div>
 				<canvas ref="waveform" style="width: 100%"></canvas>
 				<canvas ref="waveform2" style="width: 100%"></canvas>
