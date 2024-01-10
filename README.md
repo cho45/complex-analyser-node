@@ -67,6 +67,7 @@ Development
 
 init
 ```
+cargo install wasm-pack
 cargo install cargo-make
 ```
 

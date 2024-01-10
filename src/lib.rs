@@ -7,7 +7,7 @@ extern crate wasm_bindgen;
 //static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 //use std::sync::Arc;
-use rustfft::FFTplanner;
+use rustfft::FftPlanner;
 use rustfft::num_complex::Complex;
 //use rustfft::num_traits::Zero;
 //use std::mem;
@@ -32,7 +32,7 @@ macro_rules! console_log {
 pub struct ComplexAnalyserKernel {
     n: usize,
     smoothing_time_constant: f32,
-    fft: std::sync::Arc<dyn rustfft::FFT<f32>>,
+    fft: std::sync::Arc<dyn rustfft::Fft<f32>>,
     prev: Box<[f32]>,
 }
 
@@ -41,7 +41,7 @@ impl ComplexAnalyserKernel {
     #[allow(clippy::new_without_default)]
     #[wasm_bindgen(constructor)]
     pub fn new(n: usize, smoothing_time_constant: f32) -> Self {
-        let fft = FFTplanner::new(false).plan_fft(n);
+        let fft = FftPlanner::new().plan_fft_forward(n);
         let prev = vec![0.0; n].into_boxed_slice();
         Self {
             n,
@@ -61,22 +61,20 @@ impl ComplexAnalyserKernel {
 
 
     pub fn calculate_frequency_data(&mut self, input_: &mut [f32], result: &mut [f32], window: &[f32]) {
-        let input:  &mut [Complex<f32>] = unsafe { slice::from_raw_parts_mut(input_  as *mut [f32] as *mut Complex<f32>, self.n )};
-        let mut output = Vec::<Complex<f32>>::with_capacity(self.n);
-        unsafe { output.set_len(self.n); }
+        let buffer:  &mut [Complex<f32>] = unsafe { slice::from_raw_parts_mut(input_  as *mut [f32] as *mut Complex<f32>, self.n )};
 
         for i in 0..self.n {
-            input[i] *= window[i];
+            buffer[i] *= window[i];
         }
 
-        self.fft.process(input, &mut output);
+        self.fft.process(buffer);
 
         let half_n = self.n / 2;
         for i in 0..half_n {
-            result[i+half_n] = output[i].norm() / (self.n as f32);
+            result[i+half_n] = buffer[i].norm() / (self.n as f32);
         }
         for i in half_n..self.n {
-            result[i-half_n] = output[i].norm() / (self.n as f32);
+            result[i-half_n] = buffer[i].norm() / (self.n as f32);
         }
 
         for i in 0..self.n {
